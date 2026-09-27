@@ -1,25 +1,19 @@
 pipeline {
     agent any
 
-    stages {
+    environment {
+        AWS_REGION     = 'us-east-1'
+        ECR_REGISTRY   = '312098798838.dkr.ecr.us-east-1.amazonaws.com'
+        ECR_REPOSITORY = 'sre-webapp'
+    }
 
-        stage('Checkout GitHub') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/mbarun24/sre-cicd-autoscaling-project.git'
-            }
-        }
+    stages {
 
         stage('Verify Source Code') {
             steps {
                 sh '''
-                    echo "===== Working Directory ====="
                     pwd
-
-                    echo "===== Repository Files ====="
                     ls -la
-
-                    echo "===== Application Files ====="
                     ls -la app
                 '''
             }
@@ -28,19 +22,47 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                    echo "===== Building Docker Image ====="
                     docker build -t sre-webapp:${BUILD_NUMBER} .
                 '''
             }
         }
 
-        stage('Verify Docker Image') {
+        stage('Login to AWS ECR') {
             steps {
                 sh '''
-                    echo "===== Docker Images ====="
-                    docker images
+                    aws ecr get-login-password --region ${AWS_REGION} | \
+                    docker login --username AWS \
+                    --password-stdin ${ECR_REGISTRY}
                 '''
             }
+        }
+
+        stage('Tag Docker Image for ECR') {
+            steps {
+                sh '''
+                    docker tag sre-webapp:${BUILD_NUMBER} \
+                    ${ECR_REGISTRY}/${ECR_REPOSITORY}:${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Push Docker Image to ECR') {
+            steps {
+                sh '''
+                    docker push \
+                    ${ECR_REGISTRY}/${ECR_REPOSITORY}:${BUILD_NUMBER}
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Docker image successfully pushed to AWS ECR.'
+        }
+
+        failure {
+            echo 'Pipeline failed. Check console output.'
         }
     }
 }
