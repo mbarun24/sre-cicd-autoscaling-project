@@ -54,15 +54,47 @@ pipeline {
                 '''
             }
         }
+
+        stage('Deploy Kubernetes Manifests') {
+            steps {
+                sh '''
+                    aws eks update-kubeconfig \
+                      --region ${AWS_REGION} \
+                      --name sre-cicd-eks-cluster
+
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f k8s/service.yaml
+                '''
+            }
+        }
+
+        stage('Deploy Current Image to EKS') {
+            steps {
+                sh '''
+                    kubectl set image deployment/sre-webapp \
+                      sre-webapp=${ECR_REGISTRY}/${ECR_REPOSITORY}:${BUILD_NUMBER}
+                '''
+            }
+        }
+
+        stage('Verify Kubernetes Rollout') {
+            steps {
+                sh '''
+                    kubectl rollout status deployment/sre-webapp --timeout=180s
+                    kubectl get pods
+                    kubectl get service sre-webapp-service
+                '''
+            }
+        }
     }
 
     post {
         success {
-            echo 'Docker image successfully pushed to AWS ECR.'
+            echo 'CI/CD successful: image pushed to ECR and deployed to EKS.'
         }
 
         failure {
-            echo 'Pipeline failed. Check console output.'
+            echo 'Pipeline failed. Check Jenkins console output.'
         }
     }
 }
