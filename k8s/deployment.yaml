@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: sre-webapp
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: sre-webapp
+
+  template:
+    metadata:
+      labels:
+        app: sre-webapp
+
+    spec:
+      containers:
+        - name: sre-webapp
+          image: 312098798838.dkr.ecr.us-east-1.amazonaws.com/sre-webapp:6
+          ports:
+            - containerPort: 80
+
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
